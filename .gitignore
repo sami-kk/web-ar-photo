@@ -3,3 +3,14 @@ dist/
 *.local
 .DS_Store
 .vite/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Claude Code local settings (personal / machine-specific)
+.claude/settings.local.json
+
+# Environment files
+.env
+.env.*
+!.env.example
