@@ -1,0 +1,11 @@
+# テキストは LF に正規化（Windows/WSL/CIでの改行コード差を防ぐ）
+* text=auto eol=lf
+
+# バイナリ（改行変換しない）
+*.glb binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
