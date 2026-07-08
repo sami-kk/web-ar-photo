@@ -99,41 +99,96 @@ function buildGLB({ positions, indices, color, emissive = 0.2 }) {
   return Buffer.concat([header, jsonHeader, json, binHeader, binChunk]);
 }
 
-/** 額縁状のリング（フレーム用プレースホルダー、XY平面）。 */
-function frameGeometry() {
-  const O = 0.5;
-  const I = 0.42;
-  const positions = [
-    -O, -O, 0, O, -O, 0, O, O, 0, -O, O, 0, // outer 0-3
-    -I, -I, 0, I, -I, 0, I, I, 0, -I, I, 0, // inner 4-7
-  ];
+/** 2D多角形（XY平面, 順序付き頂点）を厚み方向に押し出して立体化する。 */
+function extrudePolygon(points, depth = 0.08) {
+  const N = points.length;
+  const hz = depth / 2;
+  const positions = [];
+  for (const [x, y] of points) positions.push(x, y, hz); // front 0..N-1
+  for (const [x, y] of points) positions.push(x, y, -hz); // back N..2N-1
+  positions.push(0, 0, hz); // front center = 2N
+  positions.push(0, 0, -hz); // back center = 2N+1
+  const cf = 2 * N;
+  const cb = 2 * N + 1;
   const indices = [];
-  for (let i = 0; i < 4; i++) {
-    const n = (i + 1) % 4;
-    const oI = i;
-    const oN = n;
-    const iI = 4 + i;
-    const iN = 4 + n;
-    indices.push(oI, oN, iN, oI, iN, iI);
+  for (let i = 0; i < N; i++) {
+    const n = (i + 1) % N;
+    indices.push(cf, i, n); // front cap
+    indices.push(cb, N + n, N + i); // back cap
+    indices.push(i, N + i, N + n, i, N + n, n); // side wall
   }
   return { positions, indices };
 }
 
-/** 単位立方体（装飾用プレースホルダー）。 */
-function cubeGeometry() {
-  const s = 0.5;
-  const positions = [
-    -s, -s, -s, s, -s, -s, s, s, -s, -s, s, -s, // 0-3 back
-    -s, -s, s, s, -s, s, s, s, s, -s, s, s, // 4-7 front
-  ];
-  const indices = [
-    4, 5, 6, 4, 6, 7, // front
-    1, 0, 3, 1, 3, 2, // back
-    0, 4, 7, 0, 7, 3, // left
-    5, 1, 2, 5, 2, 6, // right
-    3, 7, 6, 3, 6, 2, // top
-    0, 1, 5, 0, 5, 4, // bottom
-  ];
+/** 5つ角の星（XY平面, 厚みあり）。 */
+function starGeometry(outer = 0.5, inner = 0.21, spikes = 5) {
+  const pts = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = -Math.PI / 2 + (i * Math.PI) / spikes; // 上向きの角から開始
+    pts.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+  return extrudePolygon(pts, 0.08);
+}
+
+/** ハート形（XY平面, パラメトリック曲線をサンプリング, 厚みあり）。 */
+function heartGeometry(segments = 48) {
+  const raw = [];
+  for (let i = 0; i < segments; i++) {
+    const t = (i / segments) * Math.PI * 2;
+    const x = 16 * Math.sin(t) ** 3;
+    const y =
+      13 * Math.cos(t) -
+      5 * Math.cos(2 * t) -
+      2 * Math.cos(3 * t) -
+      Math.cos(4 * t);
+    raw.push([x, y]);
+  }
+  // 中心を原点へ寄せ、最大半径0.5に正規化する。
+  let cx = 0;
+  let cy = 0;
+  for (const [x, y] of raw) {
+    cx += x;
+    cy += y;
+  }
+  cx /= raw.length;
+  cy /= raw.length;
+  let maxR = 0;
+  const centered = raw.map(([x, y]) => {
+    const p = [x - cx, y - cy];
+    maxR = Math.max(maxR, Math.hypot(p[0], p[1]));
+    return p;
+  });
+  const scale = 0.5 / maxR;
+  const pts = centered.map(([x, y]) => [x * scale, y * scale]);
+  return extrudePolygon(pts, 0.08);
+}
+
+/** 額縁状の四角いリング（フレーム, 厚みあり）。 */
+function frameGeometry(depth = 0.06) {
+  const O = 0.5;
+  const I = 0.4;
+  const hz = depth / 2;
+  const outer = [[-O, -O], [O, -O], [O, O], [-O, O]];
+  const inner = [[-I, -I], [I, -I], [I, I], [-I, I]];
+  const positions = [];
+  const push = (x, y, z) => positions.push(x, y, z);
+  for (const [x, y] of outer) push(x, y, hz); // 0-3 outer front
+  for (const [x, y] of inner) push(x, y, hz); // 4-7 inner front
+  for (const [x, y] of outer) push(x, y, -hz); // 8-11 outer back
+  for (const [x, y] of inner) push(x, y, -hz); // 12-15 inner back
+  const OF = 0;
+  const IF = 4;
+  const OB = 8;
+  const IB = 12;
+  const indices = [];
+  for (let i = 0; i < 4; i++) {
+    const n = (i + 1) % 4;
+    indices.push(OF + i, OF + n, IF + n, OF + i, IF + n, IF + i); // 前面リング
+    indices.push(OB + i, IB + n, OB + n, OB + i, IB + i, IB + n); // 背面リング
+    indices.push(OF + i, OB + i, OB + n, OF + i, OB + n, OF + n); // 外周壁
+    indices.push(IF + i, IF + n, IB + n, IF + i, IB + n, IB + i); // 内周壁
+  }
   return { positions, indices };
 }
 
@@ -207,13 +262,13 @@ const items = [
   },
   {
     id: "decoration_star_001",
-    geo: cubeGeometry(),
+    geo: starGeometry(),
     color: [1.0, 0.83, 0.3],
     rgb: [255, 211, 77],
   },
   {
     id: "decoration_heart_001",
-    geo: cubeGeometry(),
+    geo: heartGeometry(),
     color: [1.0, 0.3, 0.42],
     rgb: [255, 77, 109],
   },
