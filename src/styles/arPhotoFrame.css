@@ -131,7 +131,8 @@ body,
   left: 0;
   right: 0;
   display: flex;
-  justify-content: space-between;
+  /* ×ボタン撤去後もフレーム選択を右上に維持する */
+  justify-content: flex-end;
   align-items: center;
   padding: 0 16px;
 }
@@ -143,10 +144,57 @@ body,
   transform: translateX(-50%);
   bottom: calc(120px + var(--ar-safe-bottom));
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
   justify-content: center;
   max-width: 94vw;
+  /* チュートリアル画像⑥のようなひとまとまりのバーとして見せる */
+  padding: 6px 8px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+/* アイコン＋ラベル型の編集ボタン（チュートリアル画像⑥に合わせた形） */
+.ar-edit-button {
+  appearance: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 48px;
+  min-height: 48px; /* タップ領域確保（仕様書 19.3） */
+  padding: 4px 6px;
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.ar-edit-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ar-edit-button--danger {
+  color: var(--ar-danger);
+}
+
+.ar-edit-button__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.ar-edit-button__label {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 /* ---- 撮影ボタン（下中央） ---- */
@@ -165,11 +213,15 @@ body,
 }
 
 .capture-button__inner {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 100%;
   border-radius: 50%;
   background: #fff;
+  /* カメラアイコン（チュートリアル画像⑧に合わせる） */
+  color: var(--ar-primary);
   transform: scale(0.82);
   transition: transform 0.1s ease;
 }

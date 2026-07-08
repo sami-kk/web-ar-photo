@@ -35,6 +35,7 @@ export type ARAction =
   | { type: "MOVE_OBJECT"; instanceId: string; x: number; y: number }
   | { type: "SET_SCALE"; instanceId: string; scale: number }
   | { type: "SET_ROTATION"; instanceId: string; rotation: number }
+  | { type: "SET_ROTATION_Y"; instanceId: string; rotationY: number }
   | { type: "RESET_OBJECT"; instanceId: string } // 中央に戻す(仕様書 26.6)
   | { type: "BRING_FORWARD"; instanceId: string } // 前面へ(仕様書 26.4)
   | { type: "SEND_BACKWARD"; instanceId: string } // 背面へ(仕様書 26.4)
@@ -100,6 +101,7 @@ export function arReducer(state: ARState, action: ARAction): ARState {
         position: { x: 0, y: 0 },
         scale: 1.0,
         rotation: 0,
+        rotationY: 0,
         zIndex: maxZ + 1,
         selected: false,
       };
@@ -180,6 +182,17 @@ export function arReducer(state: ARState, action: ARAction): ARState {
           // フレームは回転不可。rotatableなインスタンスのみ反映(仕様書 26.9)。
           o.instanceId === action.instanceId && o.rotatable
             ? { ...o, rotation: action.rotation }
+            : o,
+        ),
+      };
+
+    case "SET_ROTATION_Y":
+      return {
+        ...state,
+        displayObjects: state.displayObjects.map((o) =>
+          // Z回転と同様、rotatableなインスタンスのみ反映。
+          o.instanceId === action.instanceId && o.rotatable
+            ? { ...o, rotationY: action.rotationY }
             : o,
         ),
       };

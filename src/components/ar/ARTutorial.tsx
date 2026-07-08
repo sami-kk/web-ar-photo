@@ -3,15 +3,15 @@
 import { resolveAssetPath } from "../../utils/assetPath";
 
 const STEPS = [
+  "「フレーム一覧」から作品を追加できます",
   "フレームや装飾をタップすると選択できます",
   "選択したオブジェクトはドラッグで移動できます",
   "ピンチイン／ピンチアウトでサイズ変更できます",
-  "装飾は回転できます",
+  "装飾は回転（↺↻）とヨー回転（Y↺Y↻）で立体的に回せます",
   "選択中のオブジェクトは削除できます",
   "前面／背面を切り替えられます",
-  "見失ったオブジェクトは一覧から削除または中央に戻せます",
+  "見失ったオブジェクトは「フレーム一覧」から削除または中央に戻せます",
   "撮影ボタンで写真を撮れます",
-  "フレーム選択から作品を追加できます",
 ];
 
 export function ARTutorial({ onClose }: { onClose: () => void }) {
@@ -21,6 +21,11 @@ export function ARTutorial({ onClose }: { onClose: () => void }) {
       role="dialog"
       aria-modal="true"
       aria-label="操作チュートリアル"
+      // 背景（カード外）タップでも閉じられるようにする。カード内のタップは
+      // target が card 側になるため反応しない。
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="ar-tutorial__card">
         <h2 className="ar-tutorial__title">操作方法</h2>

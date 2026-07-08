@@ -33,6 +33,8 @@ export type DisplayObject = {
   scale: number;
   /** Z軸回転(ラジアン)。装飾のみ変更可能（仕様書 26.9） */
   rotation: number;
+  /** Y軸回転(ラジアン)。立体感を見せる「よー」回転。装飾のみ変更可能 */
+  rotationY: number;
   /** 重なり順。大きいほど前面。後から追加したものほど大きい（仕様書 26.4） */
   zIndex: number;
   /** 選択中か（仕様書 7.7） */

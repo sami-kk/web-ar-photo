@@ -60,7 +60,8 @@ function ARObjectMesh({ obj }: { obj: DisplayObject }) {
   return (
     <group
       position={[obj.position.x, obj.position.y, obj.zIndex * Z_STEP]}
-      rotation={[0, 0, obj.rotation]}
+      // Euler XYZ: 面内回転(Z)を先に適用し、その後に画面縦軸(Y)で「よー」回転。
+      rotation={[0, obj.rotationY, obj.rotation]}
       scale={[scale, scale, scale]}
       userData={{ instanceId: obj.instanceId }}
     >
@@ -112,7 +113,7 @@ function PlaceholderObject({ obj }: { obj: DisplayObject }) {
   return (
     <group
       position={[obj.position.x, obj.position.y, obj.zIndex * Z_STEP]}
-      rotation={[0, 0, obj.rotation]}
+      rotation={[0, obj.rotationY, obj.rotation]}
       scale={[scale, scale, scale]}
       userData={{ instanceId: obj.instanceId }}
     >
