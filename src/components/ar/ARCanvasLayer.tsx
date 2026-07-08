@@ -19,9 +19,12 @@ export function ARCanvasLayer() {
     >
       {/* three内部参照をDOM側へ橋渡し（raycast/撮影用） */}
       <SceneBridgeUpdater />
-      {/* 法線が無いプレースホルダーGLBでも見えるよう環境光を強めに設定 */}
-      <ambientLight intensity={1.3} />
-      <directionalLight position={[0, 0, 10000]} intensity={0.8} />
+      {/* ベース照明。斜めライトで陰影を作るため環境光はやや控えめにする。 */}
+      <ambientLight intensity={0.85} />
+      {/* 左上前方からの主光源。オルソ投影でも凹凸に陰影の勾配が出て立体的に見える。 */}
+      <directionalLight position={[-5000, 7000, 10000]} intensity={1.35} />
+      {/* 右下からの弱い補助光で影が潰れすぎないようにする。 */}
+      <directionalLight position={[4000, -3000, 6000]} intensity={0.35} />
       <ARObjectRenderer />
     </Canvas>
   );

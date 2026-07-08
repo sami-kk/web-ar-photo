@@ -111,7 +111,7 @@ export function ARPhotoFramePage() {
 
       {/* UIレイヤー（撮影画像には含めない / 仕様書 26.2） */}
       <div className="ar-ui">
-        <ARMenu onExit={exit} />
+        <ARMenu />
         <ARToolbar onCapture={() => void capture()} />
       </div>
 

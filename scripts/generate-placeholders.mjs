@@ -11,17 +11,54 @@ const OUT_ROOT = resolve(__dirname, "../public/assets/ar-objects");
 
 // ---------- GLB ----------
 
+/** 頂点法線を面法線の平均から算出する（スムーズシェーディング用）。 */
+function computeNormals(positions, indices) {
+  const n = new Float32Array(positions.length);
+  for (let i = 0; i < indices.length; i += 3) {
+    const a = indices[i] * 3;
+    const b = indices[i + 1] * 3;
+    const c = indices[i + 2] * 3;
+    const ux = positions[b] - positions[a];
+    const uy = positions[b + 1] - positions[a + 1];
+    const uz = positions[b + 2] - positions[a + 2];
+    const vx = positions[c] - positions[a];
+    const vy = positions[c + 1] - positions[a + 1];
+    const vz = positions[c + 2] - positions[a + 2];
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    for (const p of [a, b, c]) {
+      n[p] += nx;
+      n[p + 1] += ny;
+      n[p + 2] += nz;
+    }
+  }
+  for (let i = 0; i < n.length; i += 3) {
+    const l = Math.hypot(n[i], n[i + 1], n[i + 2]) || 1;
+    n[i] /= l;
+    n[i + 1] /= l;
+    n[i + 2] /= l;
+  }
+  return n;
+}
+
 function buildGLB({ positions, indices, color, emissive = 0.2 }) {
   const posArr = new Float32Array(positions);
   const idxArr = new Uint16Array(indices);
+  const nrmArr = computeNormals(positions, indices);
 
   const idxBytes = idxArr.byteLength;
   const idxPadded = Math.ceil(idxBytes / 4) * 4;
   const posBytes = posArr.byteLength;
+  const nrmBytes = nrmArr.byteLength;
 
-  const bin = Buffer.alloc(idxPadded + posBytes);
+  const bin = Buffer.alloc(idxPadded + posBytes + nrmBytes);
   Buffer.from(idxArr.buffer, idxArr.byteOffset, idxBytes).copy(bin, 0);
   Buffer.from(posArr.buffer, posArr.byteOffset, posBytes).copy(bin, idxPadded);
+  Buffer.from(nrmArr.buffer, nrmArr.byteOffset, nrmBytes).copy(
+    bin,
+    idxPadded + posBytes,
+  );
 
   // POSITION の min/max
   const min = [Infinity, Infinity, Infinity];
@@ -39,14 +76,22 @@ function buildGLB({ positions, indices, color, emissive = 0.2 }) {
     scenes: [{ nodes: [0] }],
     nodes: [{ mesh: 0 }],
     meshes: [
-      { primitives: [{ attributes: { POSITION: 1 }, indices: 0, material: 0 }] },
+      {
+        primitives: [
+          {
+            attributes: { POSITION: 1, NORMAL: 2 },
+            indices: 0,
+            material: 0,
+          },
+        ],
+      },
     ],
     materials: [
       {
         pbrMetallicRoughness: {
           baseColorFactor: [...color, 1],
           metallicFactor: 0,
-          roughnessFactor: 0.85,
+          roughnessFactor: 0.55,
         },
         emissiveFactor: color.map((c) => c * emissive),
         doubleSided: true,
@@ -56,6 +101,12 @@ function buildGLB({ positions, indices, color, emissive = 0.2 }) {
     bufferViews: [
       { buffer: 0, byteOffset: 0, byteLength: idxBytes, target: 34963 },
       { buffer: 0, byteOffset: idxPadded, byteLength: posBytes, target: 34962 },
+      {
+        buffer: 0,
+        byteOffset: idxPadded + posBytes,
+        byteLength: nrmBytes,
+        target: 34962,
+      },
     ],
     accessors: [
       {
@@ -71,6 +122,12 @@ function buildGLB({ positions, indices, color, emissive = 0.2 }) {
         type: "VEC3",
         min,
         max,
+      },
+      {
+        bufferView: 2,
+        componentType: 5126,
+        count: nrmArr.length / 3,
+        type: "VEC3",
       },
     ],
   };
@@ -99,40 +156,65 @@ function buildGLB({ positions, indices, color, emissive = 0.2 }) {
   return Buffer.concat([header, jsonHeader, json, binHeader, binChunk]);
 }
 
-/** 2D多角形（XY平面, 順序付き頂点）を厚み方向に押し出して立体化する。 */
-function extrudePolygon(points, depth = 0.08) {
-  const N = points.length;
-  const hz = depth / 2;
+/**
+ * 2D輪郭（XY平面）を前後に膨らませたクッション状の立体にする。
+ * 輪郭を中心へ向けて縮小しながらZへドーム状に持ち上げた同心リングを重ね、
+ * 前後両面を作る。オルソ投影＋斜めライトでも陰影の勾配が出て立体的に見える。
+ */
+function puffedShape(outline, { dome = 0.3, rings = 5 } = {}) {
+  const N = outline.length;
   const positions = [];
-  for (const [x, y] of points) positions.push(x, y, hz); // front 0..N-1
-  for (const [x, y] of points) positions.push(x, y, -hz); // back N..2N-1
-  positions.push(0, 0, hz); // front center = 2N
-  positions.push(0, 0, -hz); // back center = 2N+1
-  const cf = 2 * N;
-  const cb = 2 * N + 1;
   const indices = [];
-  for (let i = 0; i < N; i++) {
-    const n = (i + 1) % N;
-    indices.push(cf, i, n); // front cap
-    indices.push(cb, N + n, N + i); // back cap
-    indices.push(i, N + i, N + n, i, N + n, n); // side wall
+  const push = (x, y, z) => {
+    positions.push(x, y, z);
+    return positions.length / 3 - 1;
+  };
+
+  for (const sign of [1, -1]) {
+    // rings本の同心リング（r=0が輪郭 → apexへ収束）を作る。
+    const ringIdx = [];
+    for (let r = 0; r < rings; r++) {
+      const t = r / rings;
+      const radiusScale = Math.cos((t * Math.PI) / 2); // 1 → 0
+      const z = sign * Math.sin((t * Math.PI) / 2) * dome; // 0 → dome
+      const row = [];
+      for (const [x, y] of outline) {
+        row.push(push(x * radiusScale, y * radiusScale, z));
+      }
+      ringIdx.push(row);
+    }
+    const apex = push(0, 0, sign * dome);
+    for (let r = 0; r < rings - 1; r++) {
+      for (let k = 0; k < N; k++) {
+        const kn = (k + 1) % N;
+        const a = ringIdx[r][k];
+        const b = ringIdx[r][kn];
+        const c = ringIdx[r + 1][kn];
+        const d = ringIdx[r + 1][k];
+        indices.push(a, b, c, a, c, d);
+      }
+    }
+    const last = ringIdx[rings - 1];
+    for (let k = 0; k < N; k++) {
+      indices.push(last[k], last[(k + 1) % N], apex);
+    }
   }
   return { positions, indices };
 }
 
-/** 5つ角の星（XY平面, 厚みあり）。 */
-function starGeometry(outer = 0.5, inner = 0.21, spikes = 5) {
+/** 5つ角の星の輪郭（XY平面）。 */
+function starOutline(outer = 0.5, inner = 0.21, spikes = 5) {
   const pts = [];
   for (let i = 0; i < spikes * 2; i++) {
     const r = i % 2 === 0 ? outer : inner;
     const a = -Math.PI / 2 + (i * Math.PI) / spikes; // 上向きの角から開始
     pts.push([r * Math.cos(a), r * Math.sin(a)]);
   }
-  return extrudePolygon(pts, 0.08);
+  return pts;
 }
 
-/** ハート形（XY平面, パラメトリック曲線をサンプリング, 厚みあり）。 */
-function heartGeometry(segments = 48) {
+/** ハート形の輪郭（パラメトリック曲線を原点中心・最大半径0.5に正規化）。 */
+function heartOutline(segments = 64) {
   const raw = [];
   for (let i = 0; i < segments; i++) {
     const t = (i / segments) * Math.PI * 2;
@@ -144,7 +226,6 @@ function heartGeometry(segments = 48) {
       Math.cos(4 * t);
     raw.push([x, y]);
   }
-  // 中心を原点へ寄せ、最大半径0.5に正規化する。
   let cx = 0;
   let cy = 0;
   for (const [x, y] of raw) {
@@ -160,8 +241,17 @@ function heartGeometry(segments = 48) {
     return p;
   });
   const scale = 0.5 / maxR;
-  const pts = centered.map(([x, y]) => [x * scale, y * scale]);
-  return extrudePolygon(pts, 0.08);
+  return centered.map(([x, y]) => [x * scale, y * scale]);
+}
+
+/** 星（膨らんだ立体）。 */
+function starGeometry() {
+  return puffedShape(starOutline(), { dome: 0.22, rings: 4 });
+}
+
+/** ハート（膨らんだ立体, ぷっくり）。 */
+function heartGeometry() {
+  return puffedShape(heartOutline(), { dome: 0.32, rings: 5 });
 }
 
 /** 額縁状の四角いリング（フレーム, 厚みあり）。 */
