@@ -39,6 +39,51 @@ function ToBackIcon() {
   );
 }
 
+/** 回転アイコン（実線の円弧矢印）。direction="left"で反時計回り。 */
+function RotateIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={direction === "left" ? { transform: "scaleX(-1)" } : undefined}
+    >
+      <polyline points="23 4 23 10 17 10" />
+      <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
+    </svg>
+  );
+}
+
+/** ヨー回転アイコン（破線の円弧矢印）。チュートリアル画像⑤⑥のデザインに合わせる。 */
+function YawIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={direction === "left" ? { transform: "scaleX(-1)" } : undefined}
+    >
+      <polyline points="23 4 23 10 17 10" />
+      <path
+        d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"
+        strokeDasharray="3.2 3.2"
+      />
+    </svg>
+  );
+}
+
 /** カメラアイコン（撮影ボタン） */
 function CameraIcon() {
   return (
@@ -148,26 +193,26 @@ export function ARToolbar({ onCapture }: { onCapture: () => void }) {
           {selected.rotatable && (
             <>
               <EditButton
-                icon={<span aria-hidden="true">↺</span>}
+                icon={<RotateIcon direction="left" />}
                 label="回転"
                 ariaLabel="左に回転"
                 onClick={() => rotate(-ROTATION_STEP_DEG)}
               />
               <EditButton
-                icon={<span aria-hidden="true">↻</span>}
+                icon={<RotateIcon direction="right" />}
                 label="回転"
                 ariaLabel="右に回転"
                 onClick={() => rotate(ROTATION_STEP_DEG)}
               />
               {/* Y軸（画面縦軸）回転。立体モデルの奥行きを見せる */}
               <EditButton
-                icon={<span aria-hidden="true">Y↺</span>}
+                icon={<YawIcon direction="left" />}
                 label="ヨー"
                 ariaLabel="左へヨー回転"
                 onClick={() => rotateY(-ROTATION_STEP_DEG)}
               />
               <EditButton
-                icon={<span aria-hidden="true">Y↻</span>}
+                icon={<YawIcon direction="right" />}
                 label="ヨー"
                 ariaLabel="右へヨー回転"
                 onClick={() => rotateY(ROTATION_STEP_DEG)}
