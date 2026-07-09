@@ -30,7 +30,7 @@ export function resolveDefaultFrame(
  */
 export function validateCatalog(raw: unknown): ARObjectMeta[] {
   if (!Array.isArray(raw)) {
-    console.error("[catalog] arObjects.json は配列である必要があります。");
+    console.error("[catalog] catalog.json は配列である必要があります。");
     return [];
   }
   const seen = new Set<string>();

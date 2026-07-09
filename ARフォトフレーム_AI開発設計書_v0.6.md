@@ -1,9 +1,9 @@
 # ARフォトフレーム AI開発設計書
 
-Version: v0.5  
+Version: v0.6  
 Status: Draft
-Revision Note: v0.5では、v0.4時点の矛盾を解消し、回転仕様、JSON例、章番号、AI実装プロンプト、状態管理項目を整理。  
-Last Updated: 2026-07-05  
+Revision Note: v0.6では、作品カタログJSONをビルド同梱（import）から実行時fetchへ変更（`public/assets/ar-objects/catalog.json`）。作品追加を再ビルド不要とし、他ドメイン設置を見据えた運用に対応（10.2 / 15 / 26.4）。v0.5では、v0.4時点の矛盾を解消し、回転仕様、JSON例、章番号、AI実装プロンプト、状態管理項目を整理。  
+Last Updated: 2026-07-09  
 Target: AI実装向け仕様書 / PRD + Technical Design
 
 ---
@@ -623,19 +623,22 @@ GLBファイルとサムネイル画像は静的アセットとして配置す�
 
 ## 10.2 JSONファイル
 
-推奨ファイルパス:
+ファイルパス:
 
 ```txt
-src/data/arObjects.json
+public/assets/ar-objects/catalog.json
 ```
 
-または、ビルド環境に応じて以下でもよい。
+カタログJSONはビルドに同梱（import）せず、アプリ起動時にfetchで読み込む。
 
-```txt
-public/data/arObjects.json
-```
+- 作品（GLB・サムネイル・カタログ）の追加・変更は、配信済みサイトの
+  `assets/ar-objects/` 配下の静的ファイルを差し替えるだけで反映される
+- 再ビルドが必要なのはアプリ本体（`src/`）を変更したときのみ
+- fetchは `cache: "no-cache"` で行い、カタログ更新の反映がブラウザキャッシュで遅れないようにする
 
-初期実装では、型チェックやimportしやすさを優先し、`src/data/arObjects.json` を推奨する。
+v0.5までは型チェックやimportしやすさを優先して `src/data/arObjects.json` の
+ビルド同梱を推奨していたが、作品追加のたびに再ビルドが必要になるため、
+v0.6で実行時fetch方式へ変更した。
 
 ---
 
@@ -1074,9 +1077,6 @@ src/
     arReducer.ts
     arContext.tsx
 
-  data/
-    arObjects.json
-
   types/
     arObject.ts
     arState.ts
@@ -1093,6 +1093,7 @@ src/
 public/
   assets/
     ar-objects/
+      catalog.json
       frame_001/
         model.glb
         thumbnail.jpg
@@ -1719,7 +1720,7 @@ GLBファイル、サムネイル画像、JSONファイルは静的アセット�
 
 - GLBファイル
 - サムネイル画像
-- arObjects.json
+- catalog.json（作品カタログ。実行時にfetchされる / 10.2）
 - JavaScript bundle
 - CSS
 - その他画像ファイル
@@ -2205,7 +2206,7 @@ public/assets/ar-objects/
 
 ---
 
-## 28. 付録: サンプル arObjects.json
+## 28. 付録: サンプル catalog.json
 
 ```json
 [

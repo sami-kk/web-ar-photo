@@ -1,7 +1,7 @@
 # ARフォトフレーム (Web AR Photo Frame)
 
 スマートフォンWebブラウザ上で動作する「カメラ合成型AR」フォトフレーム機能の初期リリース実装。
-仕様書 `ARフォトフレーム_AI開発設計書_v0.5.md` に基づく。
+仕様書 `ARフォトフレーム_AI開発設計書_v0.6.md` に基づく。
 
 - React + TypeScript + Vite
 - Three.js / React Three Fiber / @react-three/drei
@@ -38,12 +38,12 @@ src/
   components/ar/                    カメラ/3D/モーダル/プレビュー/UI
   hooks/                            camera / gesture / capture / catalog
   state/                            arReducer / arContext / sceneBridge
-  data/arObjects.json               作品一覧（メタデータ）
   types/                            arObject / arState
   utils/                            normalize / capture / browserSupport / assetPath ...
   styles/arPhotoFrame.css
 public/assets/
   tutorial.png                      チュートリアル画像
+  ar-objects/catalog.json           作品一覧（メタデータ、実行時にfetch）
   ar-objects/<id>/model.glb, thumbnail.png
 scripts/generate-placeholders.mjs   プレースホルダー生成
 ```
@@ -52,8 +52,63 @@ scripts/generate-placeholders.mjs   プレースホルダー生成
 
 1. `public/assets/ar-objects/<作品ID>/` に `model.glb` と `thumbnail.jpg|png` を置く
    （フォルダ名と作品IDを一致させる / 仕様書 26.13）。
-2. `src/data/arObjects.json` にメタデータを追記する。
-3. 再ビルドする。DB・管理画面・アップロードは初期リリース対象外（仕様書 21）。
+2. `public/assets/ar-objects/catalog.json` にメタデータを追記する。
+3. 再ビルドは不要（カタログは実行時にfetchされる）。配信済みサイトへは
+   `assets/ar-objects/` 配下のファイルを差し替えるだけで反映される。
+   再ビルドが必要なのはアプリ本体（src/）を変更したときのみ。
+   DB・管理画面・アップロードは初期リリース対象外（仕様書 21）。
+
+## 別ドメイン・既存サイトへの設置（運用）
+
+設置に必要なのはビルド成果物 **`dist/` の中身一式のみ**（約5MB）。
+ソースコード・node_modules・仕様書は渡さなくてよい。
+
+```
+dist/
+  index.html
+  assets/
+    index-<hash>.js / .css        アプリ本体（ビルドごとにハッシュが変わる）
+    tutorial.png                  チュートリアル画像
+    ar-objects/
+      catalog.json                作品一覧（実行時にfetchされる）
+      <作品ID>/
+        model.glb, thumbnail.png|jpg
+```
+
+### 手順
+
+1. ビルドする。
+
+   ```bash
+   npm ci
+   npm run build
+   ```
+
+   - `base` はデフォルトで相対パス（`./`）のため、設置先のどのサブディレクトリに
+     置いてもそのまま動く。絶対パスにしたい場合のみ
+     `AR_BASE_PATH=/ar-photo/ npm run build` のように指定する（仕様書 26.3）。
+   - 撮影プレビューの「終了」ボタンの遷移先はビルド時に
+     `VITE_EXIT_URL=https://example.com/ npm run build` で指定できる。
+     未指定だと設置先ドメインのルート（`/`）へ遷移するため、
+     既存サイト配下に置く場合は指定を推奨。
+2. `dist/` の中身を設置先の任意のフォルダにそのまま配置する。
+   ルーティングを持たない1画面SPAのため、サーバー側のrewrite設定は不要。
+3. スマートフォン実機で動作確認する（チェック項目は仕様書 22 / 26.16）。
+
+### 設置先の要件・注意点
+
+- **HTTPS必須**。カメラ（getUserMedia）はHTTPSでしか動作しない（仕様書 26.5）。
+- `.glb` のMIME type は `model/gltf-binary` が望ましい（仕様書 22）。
+  多くのサーバーは設定済みで、`application/octet-stream` でも動作はする。
+- PWAではない（service worker・manifestなし）。オフラインキャッシュ等で
+  設置先サイトに影響を与えることはない。
+- **作品の追加・変更は `assets/ar-objects/` 配下の差し替えのみ**で反映され、
+  再ビルド不要。アプリ本体を変更したときだけ `index.html` と
+  `assets/index-<hash>.js|css` を差し替える（旧ハッシュのファイルは削除してよい）。
+- 既存作品のGLB・サムネイルを**同名のまま中身だけ差し替える**とブラウザ
+  キャッシュで古いモデルが表示されることがある。作品を作り直す場合は
+  作品ID（フォルダ名）を変えるのが安全。catalog.json は `no-cache` で
+  fetchされるためこの問題はない。
 
 ## 実装済み機能（受け入れ条件 / 仕様書 20・26.16）
 
